@@ -44,7 +44,8 @@ jobs:
           # Evitar sufijo -dirty (por si acaso)
           scripts/config --disable CONFIG_LOCALVERSION_AUTO
           scripts/config --set-str CONFIG_LOCALVERSION "-neko"
-          
+          scripts/config --enable CGROUPS --enable BLK_CGROUP
+          scripts/config -e CONFIG_CGROUP_DMEM
           # Optimizaciones
           scripts/config --enable CONFIG_CC_OPTIMIZE_FOR_SIZE
           scripts/config --enable CONFIG_MODULE_COMPRESS_ZSTD
