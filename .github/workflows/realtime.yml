@@ -35,13 +35,13 @@ jobs:
       - name: 4. Obtener configuración base de Void y establecer como .config
         run: |
           cd linux-src
-          wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.1/files/x86_64-dotconfig
+          wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/files/x86_64-dotconfig
           cd ..
 
       - name: 5. Aplicar parche de Void (fixdep-largefile)
         run: |
           cd linux-src
-          wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.1/patches/fixdep-largefile.patch
+          wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
           patch -p1 -N --batch < fixdep-largefile.patch
           cd ..
 
