@@ -41,7 +41,7 @@ jobs:
       - name: 5. Aplicar parche de Void (fixdep-largefile)
         run: |
           cd linux-src
-          wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.0/patches/fixdep-largefile.patch
+          wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
           # patch -p1 -N --batch < fixdep-largefile.patch
           cd ..
 
