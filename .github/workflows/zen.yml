@@ -32,7 +32,7 @@ jobs:
           patch -p1 -N --batch < fixdep-largefile.patch
           wget -O parche.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fix-ccache.patch
           patch -p1 -N --batch < parche.patch 
-          wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/files/x86_64-dotconfig
+          wget -O .config https://gitlab.archlinux.org/archlinux/packaging/packages/linux-zen/-/raw/main/config.x86_64
           #git config --global user.email "javierc@noreply.com"
           #git config --global user.name "JavierC"
           #git am *.patch
