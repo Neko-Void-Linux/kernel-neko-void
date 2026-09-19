@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  KERNEL_REVISION: 1   # Ya no se usa directamente, pero se puede dejar
+  KERNEL_REVISION: 1  
 
 jobs:
   build-kernel:
