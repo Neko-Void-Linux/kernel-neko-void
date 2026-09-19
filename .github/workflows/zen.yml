@@ -28,11 +28,11 @@ jobs:
       - name: 4. Obtener configuración base de Void 
         run: |
           cd linux-src
-          #wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.1/patches/fixdep-largefile.patch
-          #patch -p1 -N --batch < fixdep-largefile.patch
-          #wget -O parche.patch https://github.com/javiercplus/kernel-neko-void/raw/refs/heads/main/linux-v7.1.2-zen3.patch
-          #patch -p1 -N --batch < parche.patch 
-          #wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.0/files/x86_64-dotconfig
+          wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
+          patch -p1 -N --batch < fixdep-largefile.patch
+          wget -O parche.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fix-ccache.patch
+          patch -p1 -N --batch < parche.patch 
+          wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/files/x86_64-dotconfig
           #git config --global user.email "javierc@noreply.com"
           #git config --global user.name "JavierC"
           #git am *.patch
@@ -42,8 +42,6 @@ jobs:
         run: |
           cd linux-src
           sed -i 's/^EXTRAVERSION =.*/EXTRAVERSION = -zen/' Makefile
-          # Generar configuración base genérica inicial
-          make defconfig
 
           # Evitar sufijo -dirty (por si acaso)
           scripts/config --disable CONFIG_LOCALVERSION_AUTO
