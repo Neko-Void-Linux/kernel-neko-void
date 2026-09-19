@@ -23,16 +23,16 @@ jobs:
 
       - name: 3. Clonar fuentes del Zen Kernel 
         run: |
-          git clone --depth 1 --branch v7.1.2 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git linux-src
+          git clone --depth 1 https://github.com/zen-kernel/zen-kernel.git linux-src
 
       - name: 4. Obtener configuración base de Void 
         run: |
           cd linux-src
           wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.1/patches/fixdep-largefile.patch
           patch -p1 -N --batch < fixdep-largefile.patch
-          wget -O parche.patch https://github.com/javiercplus/kernel-neko-void/raw/refs/heads/main/linux-v7.1.2-zen3.patch
-          patch -p1 -N --batch < parche.patch 
-          wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.0/files/x86_64-dotconfig
+          #wget -O parche.patch https://github.com/javiercplus/kernel-neko-void/raw/refs/heads/main/linux-v7.1.2-zen3.patch
+          #patch -p1 -N --batch < parche.patch 
+          #wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.0/files/x86_64-dotconfig
           #git config --global user.email "javierc@noreply.com"
           #git config --global user.name "JavierC"
           #git am *.patch
