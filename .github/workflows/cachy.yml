@@ -145,5 +145,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Añadido por seguridad de permisos
         with:
-          tag_name: 7.1
+          tag_name: latest
           files: neko-kernel-void-*.tar.gz
