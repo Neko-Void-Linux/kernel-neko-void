@@ -26,7 +26,7 @@ jobs:
 
       - name: 3. Clonar fuentes del kernel y modificar EXTRAVERSION
         run: |
-          git clone --depth 1 --branch v7.1 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux-src
+          git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux-src
           cd linux-src
           sed -i 's/^EXTRAVERSION =.*/EXTRAVERSION = -cachy/' Makefile
           cd ..
@@ -34,13 +34,13 @@ jobs:
       - name: 4. Obtener configuración base
         run: |
           cd linux-src
-          wget -O .config https://codeberg.org/javiercplus/cachy-void/raw/branch/main/config
+          wget -O .config https://github.com/CachyOS/linux-cachyos/raw/refs/heads/master/linux-cachyos/config
           cd ..
 
       - name: 5. Aplicar parche de Void
         run: |
           cd linux-src
-          wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.1/patches/fixdep-largefile.patch
+          wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
           patch -p1 -N --batch < fixdep-largefile.patch
           cd ..
 
@@ -49,7 +49,7 @@ jobs:
           cd linux-src
           
           # Habilitar soporte para cgroups y el controlador dmem
-          scripts/config -e CONFIG_CGROUPS
+          scripts/config --enable CGROUPS --enable BLK_CGROUP
           scripts/config -e CONFIG_CGROUP_DMEM
           
           # Tus configuraciones previas
