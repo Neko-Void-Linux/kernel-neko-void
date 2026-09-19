@@ -143,6 +143,6 @@ jobs:
       - name: Subir a Release 
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: 7.1
+          tag_name: latest
           files: |
             zen-kernel-void-*.tar.gz
