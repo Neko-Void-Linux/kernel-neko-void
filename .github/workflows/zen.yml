@@ -41,7 +41,7 @@ jobs:
       - name: 5. Ajustar configuración (nombre, optimizaciones, debug, módulos)
         run: |
           cd linux-src
-          
+          sed -i 's/^EXTRAVERSION =.*/EXTRAVERSION = -zen/' Makefile
           # Generar configuración base genérica inicial
           make defconfig
 
