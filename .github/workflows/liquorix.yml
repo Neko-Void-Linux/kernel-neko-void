@@ -1,0 +1,177 @@
+name: Compilar Neko Void Kernel Liquorix
+
+on:
+  workflow_dispatch:
+
+env:
+  KERNEL_VERSION: 7.2.6
+  LIQUORIX_PACKAGE_REF: d90c299c7d211be1beb6d7ee7d5ec89690156dd4
+  KERNEL_REVISION: 1
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/void-linux/void-glibc-full:latest
+      options: --user root
+
+    steps:
+      - name: 1. Instalar dependencias del sistema
+        run: |
+          set -euo pipefail
+          xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ xbps -y
+          xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ \
+            base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd \
+            flex bison openssl-devel curl pahole tar python3 patch wget rsync \
+            perl gettext -y
+
+      - name: 2. Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: 3. Clonar el kernel base y descargar los parches de Liquorix
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch "v${KERNEL_VERSION}" \
+            https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux-src
+
+          wget -q -O liquorix-package.tar.gz \
+            "https://github.com/damentz/liquorix-package/archive/${LIQUORIX_PACKAGE_REF}.tar.gz"
+          tar -xzf liquorix-package.tar.gz
+          LIQUORIX_TREE=$(find . -type d -path '*/linux-liquorix/debian/patches' \
+            -print -quit | sed 's#/linux-liquorix/debian/patches##')
+          test -n "${LIQUORIX_TREE}"
+          echo "LIQUORIX_TREE=${LIQUORIX_TREE}" >> "$GITHUB_ENV"
+
+      - name: 4. Aplicar la serie oficial de parches Liquorix
+        run: |
+          set -euo pipefail
+          cd linux-src
+          patch_dir="${GITHUB_WORKSPACE}/${LIQUORIX_TREE}/linux-liquorix/debian/patches"
+          grep -E '^(zen|lqx)/' "${patch_dir}/series" | while IFS= read -r patch_name; do
+            echo "Aplicando ${patch_name}"
+            patch -Np1 --batch < "${patch_dir}/${patch_name}"
+          done
+
+      - name: 5. Obtener la configuración oficial de Liquorix
+        run: |
+          set -euo pipefail
+          cd linux-src
+          wget -q -O .config \
+            "https://raw.githubusercontent.com/damentz/liquorix-package/${LIQUORIX_PACKAGE_REF}/linux-liquorix/debian/config/kernelarch-x86/config-arch-64"
+          wget -q -O fixdep-largefile.patch \
+            https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
+          patch -p1 -N --batch < fixdep-largefile.patch || true
+
+      - name: 6. Ajustar configuración y versión para Neko Void
+        run: |
+          set -euo pipefail
+          cd linux-src
+
+          # Mantener el perfil Liquorix: scheduler PDS y preempción normal.
+          scripts/config --disable CONFIG_LOCALVERSION_AUTO
+          scripts/config --set-str CONFIG_LOCALVERSION ""
+          scripts/config --enable CONFIG_SCHED_ALT
+          scripts/config --enable CONFIG_SCHED_PDS
+          scripts/config --disable CONFIG_PREEMPT_RT
+          scripts/config --enable CONFIG_PREEMPT
+
+          # Nombre de release reproducible: 7.2.6-1-lqx-neko.
+          printf '%s\n' "-${KERNEL_REVISION}" > localversion.10-pkgrel
+          printf '%s\n' "-lqx-neko" > localversion.20-pkgname
+
+          # Ajustes compatibles con los demás kernels de Neko Void.
+          scripts/config --enable CONFIG_MODULES
+          scripts/config --enable CONFIG_MODVERSIONS
+          scripts/config --enable CONFIG_MODULE_UNLOAD
+          scripts/config --enable CONFIG_MODULE_COMPRESS
+          scripts/config --disable CONFIG_MODULE_COMPRESS_GZIP
+          scripts/config --enable CONFIG_MODULE_COMPRESS_ZSTD
+          scripts/config --disable CONFIG_MODULE_SIG
+          scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
+          scripts/config --disable CONFIG_DEBUG_INFO \
+            --disable CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT \
+            --disable CONFIG_DEBUG_INFO_REDUCED \
+            --disable CONFIG_DEBUG_INFO_BTF \
+            --disable CONFIG_DEBUG_VM \
+            --disable CONFIG_DEBUG_KERNEL \
+            --disable CONFIG_PROVE_LOCKING \
+            --disable CONFIG_LOCK_STAT \
+            --disable CONFIG_LATENCYTOP
+          scripts/config --disable CONFIG_HZ_300
+          scripts/config --enable CONFIG_HZ_1000 --set-val CONFIG_HZ 1000
+
+          make olddefconfig
+          test "$(make -s kernelrelease)" = "${KERNEL_VERSION}-${KERNEL_REVISION}-lqx-neko"
+
+      - name: 7. Compilar kernel y módulos
+        run: |
+          set -euo pipefail
+          cd linux-src
+          export KBUILD_BUILD_TIMESTAMP=$(date -u -d @0 +"%Y-%m-%d %H:%M:%S")
+          export KBUILD_BUILD_USER=voidlinux
+          export KBUILD_BUILD_HOST=voidlinux
+          export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
+          make -j$(nproc) prepare
+          make -j$(nproc) bzImage modules V=1 2>&1 | tee ../build.log
+
+      - name: 8. Subir logs de compilación
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: liquorix-build-logs
+          path: build.log
+
+      - name: 9. Preparar kernel, módulos y headers
+        if: success()
+        run: |
+          set -euo pipefail
+          cd linux-src
+          KERNEL_RELEASE=$(make -s kernelrelease)
+          echo "KERNEL_RELEASE=${KERNEL_RELEASE}" >> "$GITHUB_ENV"
+
+          make INSTALL_MOD_PATH="$GITHUB_WORKSPACE/modules" modules_install
+
+          mkdir -p "$GITHUB_WORKSPACE/pkg/boot"
+          cp arch/x86/boot/bzImage "$GITHUB_WORKSPACE/pkg/boot/vmlinuz-${KERNEL_RELEASE}"
+          cp System.map "$GITHUB_WORKSPACE/pkg/boot/System.map-${KERNEL_RELEASE}"
+          cp .config "$GITHUB_WORKSPACE/pkg/boot/config-${KERNEL_RELEASE}"
+
+          mkdir -p "$GITHUB_WORKSPACE/pkg/lib/modules"
+          mv "$GITHUB_WORKSPACE/modules/lib/modules/${KERNEL_RELEASE}" \
+            "$GITHUB_WORKSPACE/pkg/lib/modules/"
+
+          HEADERS_DIR="$GITHUB_WORKSPACE/pkg/usr/src/linux-headers-${KERNEL_RELEASE}"
+          mkdir -p "$HEADERS_DIR/arch/x86"
+          cp Makefile .config Module.symvers System.map "$HEADERS_DIR/"
+          cp -a scripts include "$HEADERS_DIR/"
+          cp -a arch/x86/include "$HEADERS_DIR/arch/x86/"
+          cp arch/x86/Makefile "$HEADERS_DIR/arch/x86/"
+
+          if [ -f tools/objtool/objtool ]; then
+            mkdir -p "$HEADERS_DIR/tools/objtool"
+            cp tools/objtool/objtool "$HEADERS_DIR/tools/objtool/"
+          fi
+
+          find "$HEADERS_DIR/scripts" -type f -name '*.o' -delete
+          cd "$GITHUB_WORKSPACE/pkg/lib/modules/${KERNEL_RELEASE}"
+          rm -f build source
+          ln -sf "/usr/src/linux-headers-${KERNEL_RELEASE}" build
+          ln -sf "/usr/src/linux-headers-${KERNEL_RELEASE}" source
+
+      - name: 10. Empaquetar artefactos
+        if: success()
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/pkg"
+          tar -czf "../liquorix-kernel-void-${KERNEL_RELEASE}.tar.gz" .
+
+      - name: 11. Subir a Release de Liquorix
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: liquorix
+          files: |
+            liquorix-kernel-void-*.tar.gz
