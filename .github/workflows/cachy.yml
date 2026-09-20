@@ -50,7 +50,7 @@ jobs:
           cd linux-src
           
           # Habilitar soporte para cgroups y el controlador dmem
-          scripts/config --enable CGROUPS --enable BLK_CGROUP
+          scripts/config --enable CGROUPS 
           scripts/config -e CONFIG_CGROUP_DMEM
           
           # Tus configuraciones previas
