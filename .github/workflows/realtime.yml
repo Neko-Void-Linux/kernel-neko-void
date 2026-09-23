@@ -3,9 +3,6 @@ name: Compile Neko Void Kernel (with RT over RC)
 on:
   workflow_dispatch:
 
-env:
-  KERNEL_REVISION: 1   # No longer used directly, but it can be left
-
 jobs:
   build-kernel:
     runs-on: ubuntu-latest
@@ -62,10 +59,9 @@ jobs:
           
           # --- CPU and Architecture Optimizations ---
           scripts/config --disable CONFIG_GENERIC_CPU
-          scripts/config --enable CONFIG_MNATIVE      # Native host CPU instructions
-          scripts/config --enable CONFIG_SCHED_SMT    # Better utilization of HyperThreading/SMT
-          scripts/config --enable CONFIG_SCHED_MC     # Scheduling optimization for multicore
-          scripts/config --disable CONFIG_NUMA        # Lower latency and overhead on single-socket systems
+          scripts/config --enable CONFIG_SCHED_SMT    
+          scripts/config --enable CONFIG_SCHED_MC     
+          scripts/config --disable CONFIG_NUMA     
           
           # --- Clock Frequency and Timing (1000 Hz + NO_HZ_FULL) ---
           scripts/config --disable CONFIG_HZ_300
@@ -110,8 +106,8 @@ jobs:
           scripts/config --disable CONFIG_FUNCTION_TRACER
           scripts/config --disable CONFIG_TRACING
           scripts/config --disable CONFIG_BLK_DEV_IO_TRACE
-          scripts/config --disable CONFIG_BPF_SYSCALL        # Saves significant overhead (disable only if you don't use modern network/observability tools that require it)
-          scripts/config --disable CONFIG_USERFAULTFD        # Avoids overhead and potential risk vectors
+          scripts/config --disable CONFIG_BPF_SYSCALL        
+          scripts/config --disable CONFIG_USERFAULTFD        
           scripts/config --disable CONFIG_MAGIC_SYSRQ
           
           # --- Security / Modules ---
