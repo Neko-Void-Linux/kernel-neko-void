@@ -1,10 +1,10 @@
-name: Compilar Neko Void Kernel (con RT sobre RC)
+name: Compile Neko Void Kernel (with RT over RC)
 
 on:
   workflow_dispatch:
 
 env:
-  KERNEL_REVISION: 1   # Ya no se usa directamente, pero se puede dejar
+  KERNEL_REVISION: 1   # No longer used directly, but it can be left
 
 jobs:
   build-kernel:
@@ -14,81 +14,115 @@ jobs:
       options: --user root
 
     steps:
-      - name: 1. Instalar dependencias del sistema
+      - name: 1. Install system dependencies
         run: |
           xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ xbps 
           xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd flex bison openssl-devel curl pahole tar python3 patch wget rsync -y
 
-      - name: 2. Checkout del repositorio (para scripts personalizados si los hay)
+      - name: 2. Checkout repository (for custom scripts if any)
         uses: actions/checkout@v4
         with:
           path: repo
 
-      - name: 3. Clonar fuentes del kernel (v6.18-rc4) y modificar EXTRAVERSION a -rt
+      - name: 3. Clone kernel sources (v6.18-rc4) and change EXTRAVERSION to -rt
         run: |
           git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/rt/linux-rt-devel.git linux-src
           cd linux-src
-          # Cambiar EXTRAVERSION de -rc4 a -rt
+          # Change EXTRAVERSION from -rc4 to -rt
           sed -i 's/^EXTRAVERSION =.*/EXTRAVERSION = -rt/' Makefile
           cd ..
 
-      - name: 4. Obtener configuración base de Void y establecer como .config
+      - name: 4. Get Void base config and set as .config
         run: |
           cd linux-src
           wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/files/x86_64-dotconfig
           cd ..
 
-      - name: 5. Aplicar parche de Void (fixdep-largefile)
+      - name: 5. Apply Void patch (fixdep-largefile)
         run: |
           cd linux-src
           wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
           patch -p1 -N --batch < fixdep-largefile.patch
           cd ..
 
-      - name: 7. Ajustar configuración (Hz, optimizaciones, RT, debug, nombre)
+      - name: 7. Adjust configuration (Hz, optimizations, RT, debug, name)
         run: |
           cd linux-src
-          # Desactivar la generación automática de versión git para evitar -dirty
+          
+          # --- Kernel Identity ---
           scripts/config --disable CONFIG_LOCALVERSION_AUTO
-          # Establecer LOCALVERSION con el identificador deseado (ej: -neko)
           scripts/config --set-str CONFIG_LOCALVERSION "-neko"
           
-          # Frecuencia de reloj 1000 Hz
-          scripts/config -d CONFIG_HZ_300 -e CONFIG_HZ_1000 --set-val CONFIG_HZ 1000
-          scripts/config -d CONFIG_HZ_PERIODIC -d CONFIG_NO_HZ_IDLE -e CONFIG_NO_HZ_FULL -e CONFIG_NO_HZ
+          # --- O3 Compiler Optimization (O3 Configuration) ---
           
-          # Compresión ZSTD para módulos
-          scripts/config -e CONFIG_MODULE_COMPRESS_ZSTD
+          # so it is injected via environment variables for the build step.
+          echo "KCFLAGS=-O3 -march=x86-64-v3 -mtune=generic" >> $GITHUB_ENV
+          echo "HOSTCFLAGS=-O3" >> $GITHUB_ENV
+          scripts/config --enable CONFIG_LTO_NONE # Avoids LTO interference with RT and O3
           
-          # Hugepages always (mejor rendimiento)
-          scripts/config -d CONFIG_TRANSPARENT_HUGEPAGE_MADVISE -e CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS
+          # --- CPU and Architecture Optimizations ---
+          scripts/config --disable CONFIG_GENERIC_CPU
+          scripts/config --enable CONFIG_MNATIVE      # Native host CPU instructions
+          scripts/config --enable CONFIG_SCHED_SMT    # Better utilization of HyperThreading/SMT
+          scripts/config --enable CONFIG_SCHED_MC     # Scheduling optimization for multicore
+          scripts/config --disable CONFIG_NUMA        # Lower latency and overhead on single-socket systems
           
-          # Activar RT (PREEMPT_RT)
-          scripts/config -d CONFIG_PREEMPT_VOLUNTARY
-          scripts/config -d CONFIG_PREEMPT_LL
-          scripts/config -d CONFIG_PREEMPT_NONE
-          scripts/config -e CONFIG_PREEMPT_RT
+          # --- Clock Frequency and Timing (1000 Hz + NO_HZ_FULL) ---
+          scripts/config --disable CONFIG_HZ_300
+          scripts/config --enable CONFIG_HZ_1000
+          scripts/config --set-val CONFIG_HZ 1000
+          scripts/config --disable CONFIG_HZ_PERIODIC
+          scripts/config --disable CONFIG_NO_HZ_IDLE
+          scripts/config --enable CONFIG_NO_HZ_FULL
+          scripts/config --enable CONFIG_NO_HZ
           
-          # Desactivar debug masivo
-          scripts/config --disable CONFIG_DEBUG_INFO \
-                         --disable CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT \
-                         --disable CONFIG_DEBUG_INFO_REDUCED \
-                         --disable CONFIG_DEBUG_INFO_BTF \
-                         --disable CONFIG_DEBUG_VM \
-                         --disable CONFIG_DEBUG_KERNEL \
-                         --disable CONFIG_PROVE_LOCKING \
-                         --disable CONFIG_LOCK_STAT \
-                         --disable CONFIG_LATENCYTOP
+          # --- Preempt RT (Forced and no dynamic) ---
+          scripts/config --disable CONFIG_PREEMPT_VOLUNTARY
+          scripts/config --disable CONFIG_PREEMPT_LL
+          scripts/config --disable CONFIG_PREEMPT_NONE
+          scripts/config --disable CONFIG_PREEMPT_DYNAMIC # Force pure PREEMPT_RT without runtime overrides
+          scripts/config --enable CONFIG_PREEMPT_RT
           
-          # Desactivar firma de módulos (evita problemas con certificados)
+          # --- Memory Management and Low-Latency I/O ---
+          scripts/config --disable CONFIG_TRANSPARENT_HUGEPAGE_MADVISE
+          scripts/config --enable CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS
+          scripts/config --enable CONFIG_MODULE_COMPRESS_ZSTD
+          scripts/config --set-str CONFIG_DEFAULT_IOSCHED "mq-deadline" # Better scheduler for RT
+          
+          # --- Disable Debug and Massive Overhead ---
+          scripts/config --disable CONFIG_DEBUG_INFO
+          scripts/config --disable CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT
+          scripts/config --disable CONFIG_DEBUG_INFO_REDUCED
+          scripts/config --disable CONFIG_DEBUG_INFO_BTF
+          scripts/config --disable CONFIG_DEBUG_VM
+          scripts/config --disable CONFIG_DEBUG_KERNEL
+          scripts/config --disable CONFIG_PROVE_LOCKING
+          scripts/config --disable CONFIG_LOCK_STAT
+          scripts/config --disable CONFIG_LATENCYTOP
+          
+          # --- Disable Subsystems with Unnecessary Overhead (Maximum Performance) ---
+          scripts/config --disable CONFIG_KALLSYMS
+          scripts/config --disable CONFIG_KALLSYMS_ALL
+          scripts/config --disable CONFIG_PROFILING
+          scripts/config --disable CONFIG_KPROBES
+          scripts/config --disable CONFIG_UPROBES
+          scripts/config --disable CONFIG_FTRACE
+          scripts/config --disable CONFIG_FUNCTION_TRACER
+          scripts/config --disable CONFIG_TRACING
+          scripts/config --disable CONFIG_BLK_DEV_IO_TRACE
+          scripts/config --disable CONFIG_BPF_SYSCALL        # Saves significant overhead (disable only if you don't use modern network/observability tools that require it)
+          scripts/config --disable CONFIG_USERFAULTFD        # Avoids overhead and potential risk vectors
+          scripts/config --disable CONFIG_MAGIC_SYSRQ
+          
+          # --- Security / Modules ---
           scripts/config --disable CONFIG_MODULE_SIG
           scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
           
-          # Actualizar configuración (incorpora nuevas opciones de los parches)
+          # --- Update configuration (incorporates new options and resolves dependencies) ---
           make olddefconfig
           cd ..
 
-      - name: 8. Compilar el kernel y módulos (con logs detallados)
+      - name: 8. Compile kernel and modules (with detailed logs)
         run: |
           cd linux-src
           export KBUILD_BUILD_TIMESTAMP=$(date -u -d @0 +"%Y-%m-%d %H:%M:%S")
@@ -96,19 +130,19 @@ jobs:
           export KBUILD_BUILD_HOST=voidlinux
           export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
           
-          # Compilar con V=1 para logs detallados
+          # Compile with V=1 for detailed logs (KCFLAGS and HOSTCFLAGS for O3 are applied automatically from $GITHUB_ENV)
           make -j$(nproc) prepare V=1
           make -j$(nproc) bzImage modules V=1 2>&1 | tee ../build.log
           cd ..
 
-      - name: 9. Subir logs de compilación (incluso si falla)
+      - name: 9. Upload build logs (even if it fails)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-logs
           path: build.log
 
-      - name: 10. Instalar kernel, módulos y compilar headers
+      - name: 10. Install kernel, modules, and compile headers
         if: success()
         run: |
           cd linux-src
@@ -146,13 +180,14 @@ jobs:
           ln -sf /usr/src/linux-headers-${KERNEL_RELEASE} source
           cd $GITHUB_WORKSPACE
 
-      - name: 11. Empaquetar artefactos
+      - name: 11. Package artifacts
         if: success()
         run: |
           cd $GITHUB_WORKSPACE/pkg
           tar -czf ../neko-kernel-void-${KERNEL_RELEASE}.tar.gz .
           cd ..
-      - name: Subir a Release 
+          
+      - name: Upload to Release 
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
