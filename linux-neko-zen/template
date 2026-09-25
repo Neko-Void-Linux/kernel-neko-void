@@ -1,0 +1,20 @@
+pkgname=linux-neko-zen
+version=7.2
+revision=7
+short_desc="Custom Zen kernel 7.2 precompiled for Void Linux"
+maintainer="JavierC"
+license="GPL-2.0-only"
+homepage="https://github.com/Neko-Void-Linux/kernel-neko-void"
+distfiles="https://github.com/Neko-Void-Linux/kernel-neko-void/releases/download/latest/zen-kernel-void-7.2.6-zen-neko+.tar.gz"
+checksum="15fc2161eeaa165e6347f5025d118d8740a41ac77b72436508639cbb605295b6"
+create_wrksrc=yes
+triggers="kernel-hooks"
+kernel_hooks_version="7.2.6-zen-neko+"
+do_install() {
+    vmkdir boot
+    vmkdir usr/lib/modules
+    vmkdir usr/src
+    cp -a boot/* ${DESTDIR}/boot/
+    cp -a lib/modules/* ${DESTDIR}/usr/lib/modules/
+    cp -a usr/src/* ${DESTDIR}/usr/src/
+}
