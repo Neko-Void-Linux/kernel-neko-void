@@ -1,5 +1,5 @@
 # Template file for 'kernel-neko-liquorix'
-pkgname=kernel-neko-liquorix
+pkgname=linux-neko-liquorix
 version=7.2.6
 revision=1
 short_desc="Liquorix kernel and modules for Neko Void Linux"
