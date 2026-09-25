@@ -2,6 +2,7 @@ name: Compile Neko Void Kernel (with RT over RC)
 
 on:
   workflow_dispatch:
+
 permissions:
   actions: read
   contents: write
@@ -15,19 +16,20 @@ jobs:
       - name: Check self-hosted runner availability
         id: check
         run: |
-          # Consultar la API de GitHub para obtener el estado de los runners del repositorio
+          # Intentar consultar la API de GitHub
           RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/runners)
+            https://api.github.com/repos/${{ github.repository }}/actions/runners 2>&1)
           
-          # Verificar si hay al menos un runner 'online' y no 'busy' (usando jq, preinstalado en ubuntu-latest)
-          AVAILABLE=$(echo "$RESPONSE" | jq '[.runners[] | select(.status=="online" and .busy==false)] | length > 0')
-          
-          if [ "$AVAILABLE" = "true" ]; then
-            echo "use_self_hosted=true" >> $GITHUB_OUTPUT
-            echo "Self-hosted runner disponible. Se usará para la compilación."
-          else
+          # Verificar si la respuesta es válida y hay runners disponibles
+          if echo "$RESPONSE" | grep -q "null"; then
+            echo "API no disponible o sin permisos. Usando ubuntu-latest."
             echo "use_self_hosted=false" >> $GITHUB_OUTPUT
-            echo "Self-hosted runner offline u ocupado. Fallback a ubuntu-latest de GitHub."
+          elif echo "$RESPONSE" | jq -e '[.runners[] | select(.status=="online" and .busy==false)] | length > 0' > /dev/null 2>&1; then
+            echo "Self-hosted runner disponible."
+            echo "use_self_hosted=true" >> $GITHUB_OUTPUT
+          else
+            echo "No hay self-hosted runners disponibles. Usando ubuntu-latest."
+            echo "use_self_hosted=false" >> $GITHUB_OUTPUT
           fi
 
   build-kernel:
@@ -44,73 +46,65 @@ jobs:
           xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ xbps 
           xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd flex bison openssl-devel curl pahole tar python3 patch wget rsync -y
 
-      - name: 2. Checkout repository (for custom scripts if any)
+      - name: 2. Checkout repository
         uses: actions/checkout@v4
         with:
           path: repo
 
-      - name: 3. Clone kernel sources and change EXTRAVERSION to -rt
+      - name: 3. Clone kernel sources
         run: |
           git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/rt/linux-rt-devel.git linux-src
           cd linux-src
-          # Change EXTRAVERSION from -rcX to -rt
           sed -i 's/^EXTRAVERSION =.*/EXTRAVERSION = -rt/' Makefile
           cd ..
 
-      - name: 4. Get Void base config and set as .config
+      - name: 4. Get Void base config
         run: |
           cd linux-src
           wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/files/x86_64-dotconfig
           cd ..
 
-      - name: 5. Apply Void patch (fixdep-largefile)
+      - name: 5. Apply Void patch
         run: |
           cd linux-src
           wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
           patch -p1 -N --batch < fixdep-largefile.patch
           cd ..
 
-      - name: 7. Adjust configuration (Hz, optimizations, RT, debug, name)
+      - name: 7. Adjust configuration
         run: |
           cd linux-src
           
-          # --- Kernel Identity ---
           scripts/config --disable CONFIG_LOCALVERSION_AUTO
           scripts/config --set-str CONFIG_LOCALVERSION "-neko"
           
-          # --- O2 Compiler Optimization (Estable y recomendado para el Kernel) ---
           echo "KCFLAGS=-O2 -march=x86-64-v3 -mtune=generic" >> $GITHUB_ENV
           echo "HOSTCFLAGS=-O2" >> $GITHUB_ENV
           scripts/config --enable CONFIG_LTO_NONE
           
-          # --- CPU and Architecture Optimizations ---
           scripts/config --disable CONFIG_GENERIC_CPU
           scripts/config --enable CONFIG_SCHED_SMT    
-          scripts/config --enable CONFIG_SCHED_MC     
+          scripts/config --enable CONFIG_SCHED_MC
           
-          # --- Clock Frequency and Timing (1000 Hz + NO_HZ_IDLE para escritorio) ---
           scripts/config --disable CONFIG_HZ_300
           scripts/config --enable CONFIG_HZ_1000
           scripts/config --set-val CONFIG_HZ 1000
           scripts/config --disable CONFIG_HZ_PERIODIC
-          scripts/config --enable CONFIG_NO_HZ_IDLE      # <-- Mejor para interactividad de escritorio
-          scripts/config --disable CONFIG_NO_HZ_FULL     # <-- Evita problemas de scheduler en multitarea
+          scripts/config --enable CONFIG_NO_HZ_IDLE
+          scripts/config --disable CONFIG_NO_HZ_FULL
           scripts/config --enable CONFIG_NO_HZ
           
-          # --- Preempt RT (Forced and no dynamic) ---
           scripts/config --disable CONFIG_PREEMPT_VOLUNTARY
           scripts/config --disable CONFIG_PREEMPT_LL
           scripts/config --disable CONFIG_PREEMPT_NONE
           scripts/config --disable CONFIG_PREEMPT_DYNAMIC
           scripts/config --enable CONFIG_PREEMPT_RT
           
-          # --- Memory Management (Evitar picos de latencia por compactación) ---
           scripts/config --disable CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS
-          scripts/config --enable CONFIG_TRANSPARENT_HUGEPAGE_MADVISE # <-- Permite al navegador pedirlo solo si lo necesita
+          scripts/config --enable CONFIG_TRANSPARENT_HUGEPAGE_MADVISE
           scripts/config --enable CONFIG_MODULE_COMPRESS_ZSTD
           scripts/config --set-str CONFIG_DEFAULT_IOSCHED "mq-deadline"
           
-          # --- Disable Debug and Massive Overhead ---
           scripts/config --disable CONFIG_DEBUG_INFO
           scripts/config --disable CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT
           scripts/config --disable CONFIG_DEBUG_INFO_REDUCED
@@ -121,7 +115,6 @@ jobs:
           scripts/config --disable CONFIG_LOCK_STAT
           scripts/config --disable CONFIG_LATENCYTOP
           
-          # --- Disable Subsystems with Unnecessary Overhead ---
           scripts/config --disable CONFIG_KALLSYMS
           scripts/config --disable CONFIG_KALLSYMS_ALL
           scripts/config --disable CONFIG_PROFILING
@@ -135,15 +128,13 @@ jobs:
           scripts/config --disable CONFIG_USERFAULTFD        
           scripts/config --disable CONFIG_MAGIC_SYSRQ
           
-          # --- Security / Modules ---
           scripts/config --disable CONFIG_MODULE_SIG
           scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
           
-          # --- Update configuration ---
           make olddefconfig
           cd ..
 
-      - name: 8. Compile kernel and modules (with detailed logs)
+      - name: 8. Compile kernel and modules
         run: |
           cd linux-src
           export KBUILD_BUILD_TIMESTAMP=$(date -u -d @0 +"%Y-%m-%d %H:%M:%S")
@@ -151,24 +142,12 @@ jobs:
           export KBUILD_BUILD_HOST=voidlinux
           export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
           
-          # Limitar jobs para no saturar el runner de GitHub (2-4 cores) o el self-hosted
           JOBS="$(nproc)"
           if [ "$JOBS" -gt 8 ]; then JOBS=8; fi
-          echo "Building with -j${JOBS}; full output will be saved to ../build.log"
+          echo "Building with -j${JOBS}"
           
           make -j"${JOBS}" prepare
-          set +e
-          make -j"${JOBS}" bzImage modules > ../build.log 2>&1
-          BUILD_STATUS=$?
-          tail -n 200 ../build.log
-          exit "${BUILD_STATUS}"
-
-      - name: 9. Upload build logs (even if it fails)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: build.log
+          make -j"${JOBS}" bzImage modules
 
       - name: 10. Install kernel, modules, and compile headers
         if: success()
