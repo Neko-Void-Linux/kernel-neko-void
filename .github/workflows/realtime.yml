@@ -50,40 +50,38 @@ jobs:
           scripts/config --disable CONFIG_LOCALVERSION_AUTO
           scripts/config --set-str CONFIG_LOCALVERSION "-neko"
           
-          # --- O3 Compiler Optimization (O3 Configuration) ---
-          
-          # so it is injected via environment variables for the build step.
-          echo "KCFLAGS=-O3 -march=x86-64-v3 -mtune=generic" >> $GITHUB_ENV
-          echo "HOSTCFLAGS=-O3" >> $GITHUB_ENV
-          scripts/config --enable CONFIG_LTO_NONE # Avoids LTO interference with RT and O3
+          # --- O2 Compiler Optimization (Estable y recomendado para el Kernel) ---
+          echo "KCFLAGS=-O2 -march=x86-64-v3 -mtune=generic" >> $GITHUB_ENV
+          echo "HOSTCFLAGS=-O2" >> $GITHUB_ENV
+          scripts/config --enable CONFIG_LTO_NONE
           
           # --- CPU and Architecture Optimizations ---
           scripts/config --disable CONFIG_GENERIC_CPU
           scripts/config --enable CONFIG_SCHED_SMT    
           scripts/config --enable CONFIG_SCHED_MC     
-          scripts/config --disable CONFIG_NUMA     
+          # NOTA: No deshabilites CONFIG_NUMA a menos que estés 100% seguro de que tu CPU no lo beneficia (ej. Ryzen/Threadripper)
           
-          # --- Clock Frequency and Timing (1000 Hz + NO_HZ_FULL) ---
+          # --- Clock Frequency and Timing (1000 Hz + NO_HZ_IDLE para escritorio) ---
           scripts/config --disable CONFIG_HZ_300
           scripts/config --enable CONFIG_HZ_1000
           scripts/config --set-val CONFIG_HZ 1000
           scripts/config --disable CONFIG_HZ_PERIODIC
-          scripts/config --disable CONFIG_NO_HZ_IDLE
-          scripts/config --enable CONFIG_NO_HZ_FULL
+          scripts/config --enable CONFIG_NO_HZ_IDLE      # <-- CORREGIDO: Mejor para interactividad de escritorio
+          scripts/config --disable CONFIG_NO_HZ_FULL     # <-- CORREGIDO: Evita problemas de scheduler en multitarea
           scripts/config --enable CONFIG_NO_HZ
           
           # --- Preempt RT (Forced and no dynamic) ---
           scripts/config --disable CONFIG_PREEMPT_VOLUNTARY
           scripts/config --disable CONFIG_PREEMPT_LL
           scripts/config --disable CONFIG_PREEMPT_NONE
-          scripts/config --disable CONFIG_PREEMPT_DYNAMIC # Force pure PREEMPT_RT without runtime overrides
+          scripts/config --disable CONFIG_PREEMPT_DYNAMIC
           scripts/config --enable CONFIG_PREEMPT_RT
           
-          # --- Memory Management and Low-Latency I/O ---
-          scripts/config --disable CONFIG_TRANSPARENT_HUGEPAGE_MADVISE
-          scripts/config --enable CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS
+          # --- Memory Management (Evitar picos de latencia por compactación) ---
+          scripts/config --disable CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS
+          scripts/config --enable CONFIG_TRANSPARENT_HUGEPAGE_MADVISE # <-- CORREGIDO: Permite al navegador pedirlo solo si lo necesita
           scripts/config --enable CONFIG_MODULE_COMPRESS_ZSTD
-          scripts/config --set-str CONFIG_DEFAULT_IOSCHED "mq-deadline" # Better scheduler for RT
+          scripts/config --set-str CONFIG_DEFAULT_IOSCHED "mq-deadline"
           
           # --- Disable Debug and Massive Overhead ---
           scripts/config --disable CONFIG_DEBUG_INFO
@@ -96,7 +94,7 @@ jobs:
           scripts/config --disable CONFIG_LOCK_STAT
           scripts/config --disable CONFIG_LATENCYTOP
           
-          # --- Disable Subsystems with Unnecessary Overhead (Maximum Performance) ---
+          # --- Disable Subsystems with Unnecessary Overhead ---
           scripts/config --disable CONFIG_KALLSYMS
           scripts/config --disable CONFIG_KALLSYMS_ALL
           scripts/config --disable CONFIG_PROFILING
@@ -114,7 +112,7 @@ jobs:
           scripts/config --disable CONFIG_MODULE_SIG
           scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
           
-          # --- Update configuration (incorporates new options and resolves dependencies) ---
+          # --- Update configuration ---
           make olddefconfig
           cd ..
 
