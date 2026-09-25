@@ -2,10 +2,38 @@ name: Compile Neko Void Kernel (with RT over RC)
 
 on:
   workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
 
 jobs:
+  check-runner:
+    runs-on: ubuntu-latest
+    outputs:
+      use_self_hosted: ${{ steps.check.outputs.use_self_hosted }}
+    steps:
+      - name: Check self-hosted runner availability
+        id: check
+        run: |
+          # Consultar la API de GitHub para obtener el estado de los runners del repositorio
+          RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/runners)
+          
+          # Verificar si hay al menos un runner 'online' y no 'busy' (usando jq, preinstalado en ubuntu-latest)
+          AVAILABLE=$(echo "$RESPONSE" | jq '[.runners[] | select(.status=="online" and .busy==false)] | length > 0')
+          
+          if [ "$AVAILABLE" = "true" ]; then
+            echo "use_self_hosted=true" >> $GITHUB_OUTPUT
+            echo "Self-hosted runner disponible. Se usará para la compilación."
+          else
+            echo "use_self_hosted=false" >> $GITHUB_OUTPUT
+            echo "Self-hosted runner offline u ocupado. Fallback a ubuntu-latest de GitHub."
+          fi
+
   build-kernel:
-    runs-on: [self-hosted, linux, x64]
+    needs: check-runner
+    runs-on: ${{ needs.check-runner.outputs.use_self_hosted == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    
     container:
       image: ghcr.io/void-linux/void-glibc-full:latest
       options: --user root
@@ -21,11 +49,11 @@ jobs:
         with:
           path: repo
 
-      - name: 3. Clone kernel sources (v6.18-rc4) and change EXTRAVERSION to -rt
+      - name: 3. Clone kernel sources and change EXTRAVERSION to -rt
         run: |
           git clone --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/rt/linux-rt-devel.git linux-src
           cd linux-src
-          # Change EXTRAVERSION from -rc4 to -rt
+          # Change EXTRAVERSION from -rcX to -rt
           sed -i 's/^EXTRAVERSION =.*/EXTRAVERSION = -rt/' Makefile
           cd ..
 
@@ -59,15 +87,14 @@ jobs:
           scripts/config --disable CONFIG_GENERIC_CPU
           scripts/config --enable CONFIG_SCHED_SMT    
           scripts/config --enable CONFIG_SCHED_MC     
-          # NOTA: No deshabilites CONFIG_NUMA a menos que estés 100% seguro de que tu CPU no lo beneficia (ej. Ryzen/Threadripper)
           
           # --- Clock Frequency and Timing (1000 Hz + NO_HZ_IDLE para escritorio) ---
           scripts/config --disable CONFIG_HZ_300
           scripts/config --enable CONFIG_HZ_1000
           scripts/config --set-val CONFIG_HZ 1000
           scripts/config --disable CONFIG_HZ_PERIODIC
-          scripts/config --enable CONFIG_NO_HZ_IDLE      # <-- CORREGIDO: Mejor para interactividad de escritorio
-          scripts/config --disable CONFIG_NO_HZ_FULL     # <-- CORREGIDO: Evita problemas de scheduler en multitarea
+          scripts/config --enable CONFIG_NO_HZ_IDLE      # <-- Mejor para interactividad de escritorio
+          scripts/config --disable CONFIG_NO_HZ_FULL     # <-- Evita problemas de scheduler en multitarea
           scripts/config --enable CONFIG_NO_HZ
           
           # --- Preempt RT (Forced and no dynamic) ---
@@ -79,7 +106,7 @@ jobs:
           
           # --- Memory Management (Evitar picos de latencia por compactación) ---
           scripts/config --disable CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS
-          scripts/config --enable CONFIG_TRANSPARENT_HUGEPAGE_MADVISE # <-- CORREGIDO: Permite al navegador pedirlo solo si lo necesita
+          scripts/config --enable CONFIG_TRANSPARENT_HUGEPAGE_MADVISE # <-- Permite al navegador pedirlo solo si lo necesita
           scripts/config --enable CONFIG_MODULE_COMPRESS_ZSTD
           scripts/config --set-str CONFIG_DEFAULT_IOSCHED "mq-deadline"
           
@@ -124,10 +151,11 @@ jobs:
           export KBUILD_BUILD_HOST=voidlinux
           export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
           
-          # Reserve CPU so the runner can maintain its heartbeat.
+          # Limitar jobs para no saturar el runner de GitHub (2-4 cores) o el self-hosted
           JOBS="$(nproc)"
           if [ "$JOBS" -gt 8 ]; then JOBS=8; fi
           echo "Building with -j${JOBS}; full output will be saved to ../build.log"
+          
           make -j"${JOBS}" prepare
           set +e
           make -j"${JOBS}" bzImage modules > ../build.log 2>&1
