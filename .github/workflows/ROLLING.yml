@@ -8,7 +8,7 @@ env:
 
 jobs:
   build-kernel:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     container:
       image: ghcr.io/void-linux/void-glibc-full:latest
       options: --user root
