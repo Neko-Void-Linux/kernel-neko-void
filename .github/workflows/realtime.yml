@@ -126,10 +126,16 @@ jobs:
           export KBUILD_BUILD_HOST=voidlinux
           export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
           
-          # Compile with V=1 for detailed logs (KCFLAGS and HOSTCFLAGS for O3 are applied automatically from $GITHUB_ENV)
-          make -j$(nproc) prepare V=1
-          make -j$(nproc) bzImage modules V=1 2>&1 | tee ../build.log
-          cd ..
+          # Reserve CPU so the runner can maintain its heartbeat.
+          JOBS="$(nproc)"
+          if [ "$JOBS" -gt 8 ]; then JOBS=8; fi
+          echo "Building with -j${JOBS}; full output will be saved to ../build.log"
+          make -j"${JOBS}" prepare
+          set +e
+          make -j"${JOBS}" bzImage modules > ../build.log 2>&1
+          BUILD_STATUS=$?
+          tail -n 200 ../build.log
+          exit "${BUILD_STATUS}"
 
       - name: 9. Upload build logs (even if it fails)
         if: always()
