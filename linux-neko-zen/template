@@ -1,7 +1,7 @@
 pkgname=linux-neko-zen
-version=7.2
-revision=7
-short_desc="Custom Zen kernel 7.2 precompiled for Void Linux"
+version=7.2.6
+revision=1
+short_desc="Custom Zen kernel 7.2.6 precompiled for Void Linux"
 maintainer="JavierC"
 license="GPL-2.0-only"
 homepage="https://github.com/Neko-Void-Linux/kernel-neko-void"

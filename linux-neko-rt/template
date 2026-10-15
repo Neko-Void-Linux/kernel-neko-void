@@ -1,12 +1,12 @@
 pkgname=linux-neko-rt
 version=7.3.0
-revision=2
+revision=3
 short_desc="Custom RT kernel precompiled for Void Linux + HEADERS"
 maintainer="JavierC"
 license="GPL-2.0-only"
 homepage="https://github.com/Neko-Void-Linux/kernel-neko-void"
 distfiles="https://github.com/Neko-Void-Linux/kernel-neko-void/releases/download/latest/neko-kernel-void-7.3.0-rt-neko+.tar.gz"
-checksum="788a12f3db2893f5fb846c5ebaddda3f49b35cd434610a0fb808e7dd77196eb3"
+checksum="f221f7c82e365342ba513c96a184a51d765c4f6ada78cba303249c5d4acf5ffd"
 create_wrksrc=yes
 triggers="kernel-hooks"
 kernel_hooks_version="7.3.0-rt-neko+"

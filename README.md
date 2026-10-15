@@ -10,9 +10,9 @@
 # KERNEL ZEN 
 ```
 xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd flex bison openssl-devel curl pahole tar python3 patch wget rsync -y
-git clone --depth 1 --branch v7.1.2-zen3 https://github.com/zen-kernel/zen-kernel.git linux-src
+git clone --depth 1 --branch v7.2.6-zen1 https://github.com/zen-kernel/zen-kernel.git linux-src
 cd linux-src
-wget -O .config https://raw.githubusercontent.com/void-linux/void-packages/master/srcpkgs/linux7.1/files/x86_64-dotconfig
+wget -O .config https://raw.githubusercontent.com/void-linux/void-packages/master/srcpkgs/linux7.2/files/x86_64-dotconfig
 
 # Evitar sufijo -dirty (por si acaso)
 scripts/config --disable CONFIG_LOCALVERSION_AUTO
@@ -49,7 +49,7 @@ Liquorix se construye sobre el kernel estable de Linux con su parche Zen/PDS y s
 xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd flex bison openssl-devel curl pahole tar python3 patch wget rsync perl gettext -y
 
 # KERNEL BASE Y PAQUETE DE PARCHES LIQUORIX
-git clone --depth 1 --branch v7.2.6 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux-src
+git clone --depth 1 --branch v7.2 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux-src
 wget -O liquorix-package.tar.gz https://github.com/damentz/liquorix-package/archive/refs/heads/7.2/master.tar.gz
 tar -xzf liquorix-package.tar.gz
 LIQUORIX_TREE=$(find . -type d -path '*/linux-liquorix/debian/patches' -print -quit | sed 's#/linux-liquorix/debian/patches##')
@@ -90,13 +90,13 @@ make -j$(nproc) bzImage modules V=1 2>&1 | tee ../build.log
 xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd flex bison openssl-devel curl pahole tar python3 patch wget rsync -y
 
 # CLONE REPO
-git clone --depth 1 --branch v7.1 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux-src
+git clone --depth 1 --branch v7.2 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux-src
 cd linux-src
 sed -i 's/^EXTRAVERSION =.*/EXTRAVERSION = -cachy/' Makefile
 
 # Apply config
 wget -O .config https://codeberg.org/javiercplus/cachy-void/raw/branch/main/config
-wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.1/patches/fixdep-largefile.patch
+wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
 patch -p1 -N --batch < fixdep-largefile.patch
 make olddefconfig
           
@@ -111,12 +111,12 @@ make install
 # REALTIME KERNEL
 ``` 
 xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd flex bison openssl-devel curl pahole tar python3 patch wget rsync -y
-git clone --depth 1 --branch v7.1 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux-src
+git clone --depth 1 --branch linux-7.2.y-rt https://git.kernel.org/pub/scm/linux/kernel/git/rt/linux-rt-devel.git linux-src
 cd linux-src
 # Cambiar EXTRAVERSION de -rc4 a -rt
 sed -i 's/^EXTRAVERSION =.*/EXTRAVERSION = -neko/' Makefile
-wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.1/files/x86_64-dotconfig
-wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.1/patches/fixdep-largefile.patch
+wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/files/x86_64-dotconfig
+wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
 patch -p1 -N --batch < fixdep-largefile.patch
 # Desactivar la generación automática de versión git para evitar -dirty
 scripts/config --disable CONFIG_LOCALVERSION_AUTO
