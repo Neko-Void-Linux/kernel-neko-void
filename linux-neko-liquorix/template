@@ -1,6 +1,6 @@
 # Template file for 'kernel-neko-liquorix'
 pkgname=linux-neko-liquorix
-version=7.2.6
+version=7.3.0
 revision=1
 short_desc="Liquorix kernel and modules for Neko Void Linux"
 maintainer="JavierC"
@@ -9,13 +9,13 @@ homepage="https://liquorix.net/"
 archs="x86_64*"
 
 # The archive is produced by .github/workflows/liquorix.yml.
-distfiles="https://github.com/Neko-Void-Linux/kernel-neko-void/releases/download/liquorix/liquorix-kernel-void-${version}-1-lqx-neko.tar.gz"
-checksum="SKIP"
+distfiles="https://github.com/Neko-Void-Linux/kernel-neko-void/releases/download/latest/liquorix-kernel-void-${version}-liquorix-neko%2B.tar.gz"
+checksum="33c06672b9346fd4f625b0258371b901d769ce160dcdd4af09fb9dc908f15ed9"
 create_wrksrc=yes
 
 depends="dracut kmod"
 triggers="kernel-hooks"
-kernel_hooks_version="${version}-1-lqx-neko"
+kernel_hooks_version="${version}-liquorix-neko+"
 
 do_install() {
 	vmkdir boot
