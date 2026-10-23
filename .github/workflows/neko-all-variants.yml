@@ -55,6 +55,8 @@ jobs:
       - name: 3. Ejecutar compilación de variante adaptada a Void
         run: |
           chmod +x build-kernel-neko.sh
+          PLUGIN_DIR="$(gcc -print-file-name=plugin)/include/ada/gcc-interface"
+          mkdir -p "$PLUGIN_DIR" 2>/dev/null && touch "$PLUGIN_DIR/ada-tree.def" 2>/dev/null || true
           ./build-kernel-neko.sh ${{ matrix.variant }} --march=${{ inputs.march }}
 
       - name: 4. Localizar artefacto generado

@@ -176,8 +176,8 @@ cfg -d LOCALVERSION_AUTO --set-str LOCALVERSION "$LOCALVERSION" \
     --set-str DEFAULT_HOSTNAME "nekovoid"
 # CPU genérica (paquete distribuible)
 cfg -e GENERIC_CPU -d MZEN4 -d X86_NATIVE_CPU --set-val X86_64_VERSION "$MARCH"
-# Toolchain GCC sin LTO ni Rust (no requiere clang/rustc en Void)
-cfg -e LTO_NONE -d LTO_CLANG_THIN -d LTO_CLANG_FULL -d RUST
+# Toolchain GCC sin LTO ni Rust (no requiere clang/rustc en Void) y sin plugins frágiles de GCC
+cfg -e LTO_NONE -d LTO_CLANG_THIN -d LTO_CLANG_FULL -d RUST -d GCC_PLUGINS
 # Módulos: ZSTD, sin firma obligatoria (compatible con DKMS)
 cfg -e MODULES -e MODULE_UNLOAD -e MODVERSIONS \
     -e MODULE_COMPRESS -d MODULE_COMPRESS_NONE -d MODULE_COMPRESS_GZIP \
