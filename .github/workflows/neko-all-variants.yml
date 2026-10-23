@@ -1,0 +1,88 @@
+name: Compilar TODAS las variantes de Kernel-Neko (Paralelo)
+
+on:
+  workflow_dispatch:
+    inputs:
+      march:
+        description: 'Nivel microarquitectura x86-64 para todas las variantes'
+        required: true
+        default: 'v1'
+        type: choice
+        options:
+          - v1
+          - v2
+          - v3
+
+permissions:
+  contents: write
+
+jobs:
+  build-all:
+    name: Compilar ${{ matrix.variant }} (${{ inputs.march }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - bore
+          - bmq
+          - lite
+          - lts
+          - zen
+          - liquorix
+          - rt
+          - rt-bore
+          - eevdf
+          - deckify
+          - hardened
+          - server
+          - rc
+          - neko
+    container:
+      image: ghcr.io/void-linux/void-glibc-full:latest
+      options: --user root
+
+    steps:
+      - name: 1. Instalar dependencias en Void Linux
+        shell: sh
+        run: |
+          xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ xbps -y
+          xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ bash base-devel bc kmod elfutils-devel openssl-devel flex bison perl python3 xz zstd tar patch cpio curl ncurses-devel pahole gmp-devel mpfr-devel libmpc-devel -y
+
+      - name: 2. Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: 3. Ejecutar compilación de variante adaptada a Void
+        run: |
+          chmod +x build-kernel-neko.sh
+          ./build-kernel-neko.sh ${{ matrix.variant }} --march=${{ inputs.march }}
+
+      - name: 4. Localizar artefacto generado
+        run: |
+          TAR_FILE=$(find kernel-neko-variants/output -name "*.tar.gz" | head -n 1)
+          echo "TAR_FILE=${TAR_FILE}" >> $GITHUB_ENV
+          TAR_NAME=$(basename "${TAR_FILE}")
+          echo "TAR_NAME=${TAR_NAME}" >> $GITHUB_ENV
+          RELEASE_TAG="${TAR_NAME%.tar.gz}"
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
+          sha256sum "${TAR_FILE}" > sha256sum.txt
+
+      - name: 5. Publicar Release en GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "${{ env.RELEASE_TAG }}"
+          name: "Kernel-Neko ${{ matrix.variant }} (${{ env.TAR_NAME }})"
+          body: |
+            ### Kernel-Neko ${{ matrix.variant }} para Neko Void Linux
+            Kernel compilado nativamente para Neko Void Linux con soporte de xbps-src y triggers de kernel-hooks.
+
+            - **Variante**: ${{ matrix.variant }}
+            - **Artefacto**: ${{ env.TAR_NAME }}
+            - **Nivel CPU**: ${{ inputs.march }}
+            - **Checksum SHA256**:
+            ```
+            $(cat sha256sum.txt)
+            ```
+          files: |
+            ${{ env.TAR_FILE }}
+            sha256sum.txt

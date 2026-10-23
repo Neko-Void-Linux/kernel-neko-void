@@ -1,0 +1,25 @@
+# Kernel-Neko .gitignore
+
+# Archivos pesados y directorios de compilación
+build/
+output/
+pkg/
+src/
+*.tar
+*.tar.gz
+*.tar.xz
+*.tar.zst
+*.part
+*.log
+*.log.*
+
+# Copias locales o referencias temporales
+kernel-neko-void-main/
+linux-*/
+_legacy/
+
+# Archivos de sistema y editores
+.DS_Store
+Thumbs.db
+*.swp
+*~

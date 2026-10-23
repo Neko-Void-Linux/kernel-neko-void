@@ -1,0 +1,276 @@
+================================================================================
+                    KERNEL-NEKO PARA NEKO VOID LINUX
+       Documentación Técnica, Arquitectura, Guía de Uso y Colaboración
+================================================================================
+
+1. INTRODUCCIÓN Y VISIÓN DEL PROYECTO
+--------------------------------------------------------------------------------
+Kernel-Neko es un conjunto modular de kernels Linux de alto rendimiento diseñados,
+optimizados y empaquetados específicamente para Neko Void Linux (distribución
+basada en Void Linux con sistema de inicio runit y gestor de paquetes XBPS).
+
+El proyecto nació con dos objetivos fundamentales:
+  1. Brindar máxima estabilidad, ligereza y fluidez en hardware antiguo o de
+     recursos muy limitados (equipos con 1 GB de RAM, procesadores como Intel
+     Celeron 847, Intel Core 2 Duo T7250, discos HDD mecánicos, GPUs integradas
+     Intel GMA X3100, etc., en la línea de proyectos como Loc-OS).
+  2. Proveer kernels con planificadores de CPU de vanguardia (BORE, BMQ, PDS,
+     PREEMPT_RT, EEVDF afinado) y soporte de microarquitectura (x86-64-v1, v2, v3)
+     para equipos gaming, estaciones de trabajo y consolas portátiles (handhelds).
+
+Toda la base del kernel está totalmente independizada de distribuciones ajenas:
+no contiene referencias ni dependencias hacia herramientas de Arch Linux o CachyOS;
+su identidad es 100% "Kernel-Neko", compilado bajo estándares nativos de Void
+Linux (dracut, kernel-hooks, módulos ZSTD, DKMS universal y runit).
+
+
+2. ESTRUCTURA Y ARQUITECTURA DEL REPOSITORIO
+--------------------------------------------------------------------------------
+El proyecto sigue una estructura limpia, desacoplada y orientada a módulos:
+
+/home/anomali/STORAGE/Proyectos/kernel-neko-lite/
+├── build-kernel-neko.sh         <- Script de conveniencia en la raíz. Redirige
+│                                   cualquier comando al motor en kernel-neko-variants/.
+├── DOCUMENTACION_KERNEL_NEKO.txt<- Este documento técnico para usuarios y desarrolladores.
+├── README.md                    <- Vista rápida con tablas e instrucciones básicas.
+├── _legacy/                     <- Archivo histórico seguro de antiguos PKGBUILDs de Arch.
+│
+└── kernel-neko-variants/        <- NÚCLEO DEL PROYECTO
+    ├── build-kernel-neko.sh     <- Motor principal de compilación, inyección de
+    │                               configuración y empaquetado para Void Linux.
+    ├── upstream.conf            <- Único punto de contacto con fuentes upstream
+    │                               (URLs de descarga de tarballs y parches).
+    │
+    ├── Kernel-Neko-*/           <- Directorios modulares por cada variante (14 en total):
+    │   ├── config               <- Configuración base del kernel (.config).
+    │   ├── neko.conf            <- Metadatos de la variante (versión, planificador,
+    │   │                           HZ, nivel de preemption, lista de parches).
+    │   └── template             <- Plantilla base para el sistema de empaquetado XBPS.
+    │
+    ├── build/                   <- Directorio efímero de trabajo (ignorado en Git):
+    │   ├── cache/               <- Tarballs de fuentes y parches descargados (reutilizables).
+    │   └── work/                <- Árbol de código fuente extraído y compilado.
+    │
+    └── output/                  <- Artefactos finales listos para void-packages:
+        └── <variante>[-v2|-v3]/
+            ├── linux-neko-...tar.gz
+            ├── sources/         <- Tarball listo para hostdir/sources/ de void-packages.
+            └── srcpkgs/         <- Plantilla template lista con checksum SHA256 real.
+
+
+3. NIVELES DE MICROARQUITECTURA CPU (x86-64-v1, v2 y v3)
+--------------------------------------------------------------------------------
+Para garantizar compatibilidad universal y al mismo tiempo permitir el máximo
+rendimiento en procesadores modernos, Kernel-Neko soporta tres niveles de
+instrucciones x86-64 controlados mediante el parámetro `--march`:
+
+  • --march=v1 (POR DEFECTO - UNIVERSAL):
+    - Compatible con: TODAS las CPUs de 64 bits del mercado (desde 2004 hasta hoy).
+    - Equipos objetivo: Intel Celeron (ej. 847), Core 2 Duo (ej. T7250), AMD Athlon 64,
+      y cualquier CPU moderna (Haswell, Ryzen, Core i3/i5/i7/i9).
+    - Nombre del paquete: `linux-neko-<variante>` (ejemplo: `linux-neko-lts`).
+    - Nota: Aunque es compatible universalmente, el kernel detecta y aprovecha en
+      tiempo de ejecución extensiones como SSE4.2 o AVX si la CPU las posee.
+
+  • --march=v2 (OPTIMIZADO SSE4.2 / POPCNT):
+    - Compatible con: Intel Nehalem (Core ix de 1ra generación) / AMD Bulldozer en adelante.
+    - Nombre del paquete: `linux-neko-<variante>-v2`.
+
+  • --march=v3 (OPTIMIZADO AVX / AVX2 / FMA / BMI2):
+    - Compatible con: Intel Haswell (4ta generación en adelante) y AMD Ryzen (Zen 1/2/3/4/5).
+    - Rendimiento: Genera código vectorizado para operaciones criptográficas, compresión
+      de memoria zswap y cálculo intensivo.
+    - Nombre del paquete: `linux-neko-<variante>-v3`.
+
+
+4. CATÁLOGO DE VARIANTES Y CASOS DE USO
+--------------------------------------------------------------------------------
+El proyecto cuenta con 14 variantes diseñadas para perfiles específicos:
+
+  1. lite (`linux-neko-lite`):
+     - Especial para: PCs de bajos recursos, 1GB de RAM, procesadores de 2 núcleos o atom.
+     - Ajustes: Optimizado en tamaño (-Os), zswap activado por defecto con algoritmo
+       ultra-rápido LZ4, planificador I/O BFQ para discos mecánicos (HDD), HZ=300,
+       ticks idle para no saturar la CPU y desactivación de auditorías/debug innecesarios.
+
+  2. lts (`linux-neko-lts`):
+     - Especial para: Servidores, equipos de trabajo que requieren máxima estabilidad.
+     - Base: Rama LTS oficial (6.18) con parches de rendimiento de baja latencia y EEVDF.
+
+  3. bore (`linux-neko-bore`):
+     - Especial para: Escritorio de alta respuesta y videojuegos.
+     - Planificador: BORE (Burst-Oriented Response Enhancer), prioriza las tareas
+       interactivas del usuario reduciendo cualquier tipo de stuttering o congelamiento.
+
+  4. bmq (`linux-neko-bmq`):
+     - Planificador: BMQ (Project C de Con Kolivas / Alfred Chen).
+     - Característica: Cola de prioridades O(1) ligera, excelente para latencias predecibles.
+
+  5. eevdf (`linux-neko-eevdf`):
+     - Planificador: EEVDF nativo de Linux ajustado con parches de rendimiento.
+
+  6. rt (`linux-neko-rt`):
+     - Planificador: Tiempo real duro (PREEMPT_RT).
+     - Especial para: Producción musical, audio profesional (JACK/PipeWire) y robótica.
+
+  7. rt-bore (`linux-neko-rt-bore`):
+     - Híbrido: Combina la garantía estricta de PREEMPT_RT con el ordenamiento BORE.
+
+  8. liquorix (`linux-neko-liquorix`):
+     - Puerto del afamado kernel Liquorix con planificador PDS y ajustes multimedia.
+
+  9. zen (`linux-neko-zen`):
+     - Kernel interactivo basado en el proyecto Zen-Kernel.
+
+  10. deckify (`linux-neko-deckify`):
+      - Especial para: Consolas portátiles estilo Steam Deck, Asus ROG Ally, Lenovo Legion Go.
+      - Ajustes: Incluye parches de acpi-call y controladores táctiles/handheld.
+
+  11. hardened (`linux-neko-hardened`):
+      - Especial para: Entornos de alta seguridad. Mitigaciones activas y parches de hardening.
+
+  12. server (`linux-neko-server`):
+      - Especial para: Servidores sin interfaz gráfica. HZ=300, preemption diferido (lazy).
+
+  13. rc (`linux-neko-rc`):
+      - Para pruebas de versiones candidatas (Release Candidate) más recientes.
+
+  14. neko (`linux-neko`):
+      - Kernel insignia estándar multipropósito optimizado con BORE y HZ=1000.
+
+
+5. COMPATIBILIDAD CON RUNIT Y VOID LINUX
+--------------------------------------------------------------------------------
+¿Tiene alguna incompatibilidad con el init system `runit` de Void Linux?
+  RESPUESTA: NINGUNA. Es 100% compatible.
+
+  • Separación de capas: El kernel se encarga del hardware, memoria y procesos.
+    Una vez inicializado, ejecuta `/sbin/init` (que en Void apunta a `runit-init`).
+  • Configuración de arranque: Todos los kernels Neko tienen activos los estándares
+    POSIX que requiere runit: devtmpfs con automount, cgroups v1 y v2, procfs y sysfs.
+  • Integración de empaquetado:
+    - La plantilla XBPS generada define `triggers="kernel-hooks"`.
+    - Al instalar el kernel con `xbps-install`, Void ejecuta dracut para generar
+      el initramfs (que contiene los scripts de runit) y actualiza GRUB de inmediato.
+  • Soporte DKMS: Las cabeceras del kernel (`kernel-headers`) se instalan con toda la
+    estructura requerida para compilar módulos externos (nvidia, broadcom-wl, virtualbox).
+
+
+6. GUÍA DE USO PASO A PASO
+--------------------------------------------------------------------------------
+Requisitos previos en Void Linux:
+  sudo xbps-install -Syu
+  sudo xbps-install -y base-devel bc kmod elfutils-devel openssl-devel flex bison \
+                       perl python3 xz zstd tar patch cpio curl ncurses-devel pahole
+
+A. Ver variantes disponibles:
+  cd /home/anomali/STORAGE/Proyectos/kernel-neko-lite
+  ./build-kernel-neko.sh list
+
+B. Comprobar parches y configuración SIN compilar (--config-only):
+  ./build-kernel-neko.sh lts --march=v3 --config-only
+  ./build-kernel-neko.sh lite --march=v1 --config-only
+
+C. Compilar una variante (ejemplos):
+  # 1. Compilar LTS optimizado para CPU moderna (Haswell/Zen en adelante):
+  ./build-kernel-neko.sh lts --march=v3
+
+  # 2. Compilar LTS universal (para Core 2 Duo / Celeron / cualquier equipo):
+  ./build-kernel-neko.sh lts --march=v1
+
+  # 3. Compilar variante Lite para equipos con 1GB de RAM:
+  ./build-kernel-neko.sh lite --march=v1
+
+  # 4. Modificar opciones interactivamente con menú ncurses antes de compilar:
+  ./build-kernel-neko.sh bore --menuconfig
+
+D. Variables de entorno opcionales:
+  NEKO_JOBS=4 ./build-kernel-neko.sh lts    # Limitar compilación a 4 hilos
+  NEKO_BTF=yes ./build-kernel-neko.sh bore   # Mantener BTF (requerido para scx/sched_ext)
+
+
+7. INSTALACIÓN DEL KERNEL EN VOID LINUX (XBPS-SRC)
+--------------------------------------------------------------------------------
+Cuando el proceso de compilación finaliza, los artefactos quedan generados en:
+  kernel-neko-variants/output/<Nombre-Variante>/
+
+Para instalar el paquete generado en tu sistema Void Linux:
+
+  1. Configurar void-packages (si aún no lo tienes):
+     git clone --depth=1 https://github.com/void-linux/void-packages.git ~/void-packages
+     cd ~/void-packages && ./xbps-src binary-bootstrap
+
+  2. Copiar la plantilla (template) y el tarball de fuentes:
+     # Detectar árbol void-packages (~/void-packages o ~/.local/share/pkgs/void-packages):
+     VPKG_DIR="$([ -d "$HOME/.local/share/pkgs/void-packages" ] && echo "$HOME/.local/share/pkgs/void-packages" || echo "$HOME/void-packages")"
+
+     # Copiar template:
+     cp -r /home/anomali/STORAGE/Proyectos/kernel-neko-lite/kernel-neko-variants/output/Kernel-Neko-lts-v3/srcpkgs/linux-neko-lts-v3 "${VPKG_DIR}/srcpkgs/"
+
+     # Copiar tarball compilado directamente a hostdir/sources/ (¡sin subcarpetas!):
+     mkdir -p "${VPKG_DIR}/hostdir/sources"
+     cp /home/anomali/STORAGE/Proyectos/kernel-neko-lite/kernel-neko-variants/output/Kernel-Neko-lts-v3/linux-neko-lts-v3-6.18.55.tar.gz "${VPKG_DIR}/hostdir/sources/"
+
+  3. Construir el paquete binario XBPS:
+     cd "${VPKG_DIR}"
+     ./xbps-src pkg linux-neko-lts-v3
+
+  4. Instalar el kernel en el sistema:
+     sudo xbps-install -R hostdir/binpkgs linux-neko-lts-v3
+
+  5. Reiniciar el sistema y verificar con fastfetch o uname:
+     uname -r
+
+MÉTODO ALTERNATIVO: Instalación Directa Manual (sin pasar por xbps-src)
+  Si prefieres no usar el gestor de paquetes y aplicar el kernel directamente:
+     # Extraer los archivos del paquete compilado a la raíz del sistema:
+     sudo tar -xzf /home/anomali/STORAGE/Proyectos/kernel-neko-lite/kernel-neko-variants/output/Kernel-Neko-lts-v3/linux-neko-lts-v3-6.18.55.tar.gz -C /
+
+     # Registrar módulos, generar initramfs con dracut y actualizar GRUB:
+     KV="6.18.55-neko-lts"
+     sudo depmod -a "$KV"
+     sudo dracut --force "/boot/initramfs-${KV}.img" "$KV"
+     sudo grub-mkconfig -o /boot/grub/grub.cfg
+
+
+8. GUÍA PARA COLABORADORES (CÓMO EXPANDIR EL PROYECTO)
+--------------------------------------------------------------------------------
+Si deseas crear una nueva variante o contribuir mejoras, sigue estas normas:
+
+  A. Cero branding externo:
+     - Nunca uses nombres de otras distribuciones en los paquetes generados o plantillas.
+     - El usuario y host de compilación siempre deben ser `nekovoid`.
+
+  B. Cómo agregar una nueva variante (ejemplo: "Kernel-Neko-gaming"):
+     1. Crear la carpeta: `kernel-neko-variants/Kernel-Neko-gaming/`
+     2. Crear su archivo `neko.conf`:
+        NEKO_PKG="linux-neko-gaming"
+        NEKO_DESC="Kernel-Neko Gaming Edition"
+        SRC_TYPE="perf"          # perf, vanilla o zen
+        SRC_TAG="7.3.0-2"
+        MAJOR="7.3"
+        KVER="7.3.0"
+        LOCALVERSION="-neko-gaming"
+        PATCHES=(bore)           # Parches declarados en upstream.conf
+        PERF_TWEAKS="yes"
+        SCHED="bore"
+        RT="no"
+        HZ="1000"
+        TICK="full"
+        PREEMPT="full"
+        THP="always"
+        O3="yes"
+        LITE="no"
+     3. Copiar o generar un archivo base `config`.
+     4. Listo: `./build-kernel-neko.sh list` detectará automáticamente la variante.
+
+  C. Cómo añadir nuevos parches en `upstream.conf`:
+     - Edita `upstream.conf` y añade la URL en la función `neko_patch_url()`.
+     - De esta manera ningún script descarga archivos de URLs "hardcodeadas" en código.
+
+  D. Pruebas de integración:
+     - Antes de enviar un cambio o compilar en masa, ejecuta siempre:
+       `./build-kernel-neko.sh <tu-variante> --config-only`
+       Esto valida que el tarball se descargue, los parches apliquen limpiamente
+       y las banderas del kernel queden activas sin errores.
+================================================================================

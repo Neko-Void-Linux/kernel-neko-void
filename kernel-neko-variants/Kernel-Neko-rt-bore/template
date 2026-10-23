@@ -1,0 +1,27 @@
+# Template file for 'linux-neko-rt-bore'
+pkgname=linux-neko-rt-bore
+version=7.3.0
+revision=1
+archs="x86_64*"
+short_desc="Kernel-Neko Realtime + BORE for Neko Void Linux"
+maintainer="Neko Void Linux <nekovoid@local>"
+license="GPL-2.0-only"
+homepage="https://github.com/Neko-Void-Linux/Kernel-Neko"
+distfiles="https://github.com/Neko-Void-Linux/Kernel-Neko/releases/download/linux-neko-rt-bore-7.3.0/linux-neko-rt-bore-7.3.0.tar.gz"
+checksum="0000000000000000000000000000000000000000000000000000000000000000"
+create_wrksrc=yes
+depends="linux-base"
+nodebug=yes
+nostrip=yes
+noverifyrdeps=yes
+noshlibprovides=yes
+preserve=yes
+triggers="kernel-hooks"
+kernel_hooks_version="7.3.0-neko-rt-bore"
+
+do_install() {
+	vmkdir boot
+	vmkdir usr
+	cp -a boot/. ${DESTDIR}/boot/
+	cp -a usr/. ${DESTDIR}/usr/
+}
