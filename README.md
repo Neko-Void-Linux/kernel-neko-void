@@ -1,161 +1,105 @@
-# kernel-neko-void
-- Workflows of Neko Void for builds kernels
-<img width="1280" height="768" alt="image" src="https://github.com/user-attachments/assets/74c14b59-c9c8-4422-b834-cc789f64d738" />
+# Kernel-Neko 🐾
 
+Repositorio unificado de compilación y empaquetado de kernels para **Neko Void Linux**.
 
+---
 
+## Variantes Disponibles
 
-#  MANUAL BUILD ON VOID:
+El proyecto soporta 14 variantes optimizadas:
 
-# KERNEL ZEN 
-```
-xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd flex bison openssl-devel curl pahole tar python3 patch wget rsync -y
-git clone --depth 1 --branch v7.2.6-zen1 https://github.com/zen-kernel/zen-kernel.git linux-src
-cd linux-src
-wget -O .config https://raw.githubusercontent.com/void-linux/void-packages/master/srcpkgs/linux7.2/files/x86_64-dotconfig
+| Variante | Paquete XBPS | Descripción / Planificador |
+| :--- | :--- | :--- |
+| **`bore`** | `linux-neko-bore` | Planificador **BORE** (Burst-Oriented Response Enhancer) para fluidez interactiva |
+| **`bmq`** | `linux-neko-bmq` | Planificador **BMQ** (Project C) con cola O(1) de baja latencia |
+| **`lite`** | `linux-neko-lite` | Ultra-ligero para computadoras de bajos recursos (1GB RAM, Loc-OS style) |
+| **`lts`** | `linux-neko-lts` | Soporte prolongado (rama 6.18) con parches de rendimiento |
+| **`zen`** | `linux-neko-zen` | Kernel Zen interactivo |
+| **`liquorix`** | `linux-neko-liquorix` | Kernel Liquorix (PDS) de baja latencia para multimedia y juegos |
+| **`rt`** | `linux-neko-rt` | Tiempo real estricto (`PREEMPT_RT`) |
+| **`rt-bore`** | `linux-neko-rt-bore` | Combinación de tiempo real (`PREEMPT_RT`) y BORE |
+| **`neko`** | `linux-neko` | Kernel-Neko estándar optimizado |
+| **`eevdf`** | `linux-neko-eevdf` | Kernel EEVDF estándar afinado |
+| **`deckify`** | `linux-neko-deckify` | Optimizado para consolas portátiles y dispositivos handheld |
+| **`hardened`** | `linux-neko-hardened` | Endurecimiento y mitigación avanzada de seguridad |
+| **`server`** | `linux-neko-server` | Optimizado para cálculo continuo y servidores |
+| **`rc`** | `linux-neko-rc` | Versión *Release Candidate* upstream |
 
-# Evitar sufijo -dirty (por si acaso)
-scripts/config --disable CONFIG_LOCALVERSION_AUTO
-scripts/config --set-str CONFIG_LOCALVERSION "-neko"
-# Optimizaciones
-scripts/config --enable CONFIG_CC_OPTIMIZE_FOR_SIZE
-scripts/config --enable CONFIG_MODULE_COMPRESS_ZSTD
-          
-# Desactivar debug masivo
-scripts/config --disable CONFIG_DEBUG_INFO \
-                         --disable CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT \
-                         --disable CONFIG_DEBUG_INFO_REDUCED \
-                         --disable CONFIG_DEBUG_INFO_BTF \
-                         --disable CONFIG_DEBUG_VM \
-                         --disable CONFIG_DEBUG_KERNEL \
-                         --disable CONFIG_PROVE_LOCKING \
-                         --disable CONFIG_LOCK_STAT \
-                         --disable CONFIG_LATENCYTOP
+---
 
-# Desactivar firma de módulos
-scripts/config --disable CONFIG_MODULE_SIG
-scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
-          
-# Actualizar configuración (incorpora nuevas opciones)
-make olddefconfig
-make -j$(nproc) prepare
-make -j$(nproc) bzImage modules V=1 2>&1 | tee ../build.log
-```
+## Requisitos Previos en Void Linux
 
-# KERNEL LIQUORIX
-Liquorix se construye sobre el kernel estable de Linux con su parche Zen/PDS y su configuración oficial. Esta variante no activa `PREEMPT_RT`; es un kernel de baja latencia para escritorio y juegos.
+Instala las herramientas de compilación necesarias:
+
 ```bash
-# DEPENDENCIES
-xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd flex bison openssl-devel curl pahole tar python3 patch wget rsync perl gettext -y
-
-# KERNEL BASE Y PAQUETE DE PARCHES LIQUORIX
-git clone --depth 1 --branch v7.2 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux-src
-wget -O liquorix-package.tar.gz https://github.com/damentz/liquorix-package/archive/refs/heads/7.2/master.tar.gz
-tar -xzf liquorix-package.tar.gz
-LIQUORIX_TREE=$(find . -type d -path '*/linux-liquorix/debian/patches' -print -quit | sed 's#/linux-liquorix/debian/patches##')
-
-cd linux-src
-LIQUORIX_PATCHES="../${LIQUORIX_TREE}/linux-liquorix/debian/patches"
-grep -E '^(zen|lqx)/' "${LIQUORIX_PATCHES}/series" | while IFS= read -r patch_name; do
-    patch -Np1 --batch < "${LIQUORIX_PATCHES}/${patch_name}"
-done
-
-# CONFIGURACIÓN OFICIAL DE LIQUORIX
-wget -O .config https://raw.githubusercontent.com/damentz/liquorix-package/7.2/master/linux-liquorix/debian/config/kernelarch-x86/config-arch-64
-wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
-patch -p1 -N --batch < fixdep-largefile.patch || true
-
-# IDENTIFICACIÓN DE NEKO VOID Y AJUSTES DE MÓDULOS
-scripts/config --disable CONFIG_LOCALVERSION_AUTO
-scripts/config --set-str CONFIG_LOCALVERSION ""
-scripts/config --enable CONFIG_SCHED_ALT --enable CONFIG_SCHED_PDS
-scripts/config --disable CONFIG_PREEMPT_RT --enable CONFIG_PREEMPT
-printf '%s\n' "-1" > localversion.10-pkgrel
-printf '%s\n' "-lqx-neko" > localversion.20-pkgname
-scripts/config --enable CONFIG_MODULES --enable CONFIG_MODVERSIONS --enable CONFIG_MODULE_UNLOAD
-scripts/config --enable CONFIG_MODULE_COMPRESS --disable CONFIG_MODULE_COMPRESS_GZIP --enable CONFIG_MODULE_COMPRESS_ZSTD
-scripts/config --disable CONFIG_MODULE_SIG
-scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
-scripts/config --disable CONFIG_DEBUG_INFO --disable CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT --disable CONFIG_DEBUG_INFO_REDUCED --disable CONFIG_DEBUG_INFO_BTF
-scripts/config --disable CONFIG_HZ_300 --enable CONFIG_HZ_1000 --set-val CONFIG_HZ 1000
-
-make olddefconfig
-make -j$(nproc) prepare
-make -j$(nproc) bzImage modules V=1 2>&1 | tee ../build.log
+sudo xbps-install -Syu
+sudo xbps-install -y base-devel bc kmod elfutils-devel openssl-devel flex bison perl python3 xz zstd tar patch cpio curl ncurses-devel pahole
 ```
 
-# KERNEL CACHYOS 
+---
+
+## Instrucciones de Compilación
+
+### 1. Listar variantes y niveles de arquitectura
 ```bash
-# DEPENDENCIES
-xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd flex bison openssl-devel curl pahole tar python3 patch wget rsync -y
-
-# CLONE REPO
-git clone --depth 1 --branch v7.2 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux-src
-cd linux-src
-sed -i 's/^EXTRAVERSION =.*/EXTRAVERSION = -cachy/' Makefile
-
-# Apply config
-wget -O .config https://codeberg.org/javiercplus/cachy-void/raw/branch/main/config
-wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
-patch -p1 -N --batch < fixdep-largefile.patch
-make olddefconfig
-          
-# Compile
-make -j$(nproc) 
-make -j$(nproc) bzImage modules 
-
-# Install
-make install
+./build-kernel-neko.sh list
 ```
 
-# REALTIME KERNEL
-``` 
-xbps-install -Syu --repository=https://repo-de.voidlinux.org/current/ base-devel git bc kmod elfutils-devel bash cpio xz lz4 zstd flex bison openssl-devel curl pahole tar python3 patch wget rsync -y
-git clone --depth 1 --branch linux-7.2.y-rt https://git.kernel.org/pub/scm/linux/kernel/git/rt/linux-rt-devel.git linux-src
-cd linux-src
-# Cambiar EXTRAVERSION de -rc4 a -rt
-sed -i 's/^EXTRAVERSION =.*/EXTRAVERSION = -neko/' Makefile
-wget -O .config https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/files/x86_64-dotconfig
-wget -O fixdep-largefile.patch https://github.com/void-linux/void-packages/raw/refs/heads/master/srcpkgs/linux7.2/patches/fixdep-largefile.patch
-patch -p1 -N --batch < fixdep-largefile.patch
-# Desactivar la generación automática de versión git para evitar -dirty
-scripts/config --disable CONFIG_LOCALVERSION_AUTO
-# Establecer LOCALVERSION con el identificador deseado (ej: -neko)
-scripts/config --set-str CONFIG_LOCALVERSION "-neko"
-          
-# Frecuencia de reloj 1000 Hz
-scripts/config -d CONFIG_HZ_300 -e CONFIG_HZ_1000 --set-val CONFIG_HZ 1000
-scripts/config -d CONFIG_HZ_PERIODIC -d CONFIG_NO_HZ_IDLE -e CONFIG_NO_HZ_FULL -e CONFIG_NO_HZ
-          
-# Compresión ZSTD para módulos
-scripts/config -e CONFIG_MODULE_COMPRESS_ZSTD
-          
-# Hugepages always (mejor rendimiento)
-scripts/config -d CONFIG_TRANSPARENT_HUGEPAGE_MADVISE -e CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS
-          
-# Activar RT (PREEMPT_RT)
-scripts/config -d CONFIG_PREEMPT_VOLUNTARY
-scripts/config -d CONFIG_PREEMPT_LL
-scripts/config -d CONFIG_PREEMPT_NONE
-scripts/config -e CONFIG_PREEMPT_RT
-          
-# Desactivar debug masivo
-scripts/config --disable CONFIG_DEBUG_INFO \
-               --disable CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT \
-                --disable CONFIG_DEBUG_INFO_REDUCED \
-                --disable CONFIG_DEBUG_INFO_BTF \
-                --disable CONFIG_DEBUG_VM \
-                 --disable CONFIG_DEBUG_KERNEL \
-                 --disable CONFIG_PROVE_LOCKING \
-                 --disable CONFIG_LOCK_STAT \
-                  --disable CONFIG_LATENCYTOP
-          
-# Desactivar firma de módulos (evita problemas con certificados)
-scripts/config --disable CONFIG_MODULE_SIG
-scripts/config --set-str CONFIG_SYSTEM_TRUSTED_KEYS ""
-          
-# Actualizar configuración (incorpora nuevas opciones de los parches)
-make olddefconfig
-make -j$(nproc) prepare V=1
-make -j$(nproc) bzImage modules V=1 2>&1 | tee ../build.log
-``` 
+### 2. Niveles de Compatibilidad x86-64 (v1, v2 y v3)
+
+Por defecto, la compilación se realiza en **x86-64-v1**, lo que significa que el kernel resultante es **universal y compatible directamente con v1, v2, v3 y v4**:
+
+- **`--march=v1` (Por defecto / Universal)**:
+  - Compatible con **todas** las CPUs de 64 bits: Core 2 Duo, Intel Celeron 847, AMD Athlon 64, Core i3/i5/i7, AMD Ryzen.
+  - Genera el paquete estándar (ejemplo: `linux-neko-bore`).
+  - Aprovecha dinámicamente aceleraciones de hardware (SSE4.2, AVX2, AES-NI) en tiempo de ejecución si la CPU las tiene.
+
+- **`--march=v2` (Optimizado SSE4.2 / POPCNT)**:
+  - Optimizado para procesadores Intel Nehalem / Core ix 1ra gen / AMD Bulldozer en adelante.
+  - Compatible con CPUs v2, v3 y v4.
+  - Genera el paquete `linux-neko-<variante>-v2`.
+
+- **`--march=v3` (Optimizado AVX / AVX2 / FMA / BMI2)**:
+  - Optimizado para procesadores modernos: Intel Haswell 4ta gen en adelante y AMD Zen 1/2/3/4/5.
+  - Genera el paquete `linux-neko-<variante>-v3`.
+
+### 3. Ejemplos de Compilación
+
+```bash
+# Compilar Kernel-Neko BORE universal (compatible con v1, v2 y v3):
+./build-kernel-neko.sh bore
+
+# Compilar Kernel-Neko BORE optimizado para CPUs modernas (v3 - AVX2):
+./build-kernel-neko.sh bore --march=v3
+
+# Compilar Kernel-Neko Lite para hardware modesto / 1GB RAM:
+./build-kernel-neko.sh lite
+
+# Abrir el menú de configuración antes de compilar:
+./build-kernel-neko.sh bore --menuconfig
+```
+
+---
+
+## Empaquetado e Instalación en Void Linux con `xbps-src`
+
+Una vez finalizada la compilación de la variante (por ejemplo `bore`):
+
+```bash
+# 1. Copiar la plantilla generada a tu árbol de void-packages
+VPKG_DIR="$([ -d "$HOME/.local/share/pkgs/void-packages" ] && echo "$HOME/.local/share/pkgs/void-packages" || echo "$HOME/void-packages")"
+cp -r kernel-neko-variants/output/Kernel-Neko-bore/srcpkgs/linux-neko-bore "${VPKG_DIR}/srcpkgs/"
+
+# 2. Copiar el tarball compilado directamente a hostdir/sources/
+mkdir -p "${VPKG_DIR}/hostdir/sources"
+cp kernel-neko-variants/output/Kernel-Neko-bore/linux-neko-bore-*.tar.gz "${VPKG_DIR}/hostdir/sources/"
+
+# 3. Construir el paquete nativo .xbps
+cd "${VPKG_DIR}"
+./xbps-src pkg linux-neko-bore
+
+# 4. Instalar el paquete en el sistema
+sudo xbps-install -R hostdir/binpkgs linux-neko-bore
+```
+
+Al instalarse, `kernel-hooks` ejecutará automáticamente `dracut` para crear el initramfs y registrará la entrada en el menú de GRUB.

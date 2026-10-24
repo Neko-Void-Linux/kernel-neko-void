@@ -1,0 +1,27 @@
+# Template file for 'linux-neko-hardened'
+pkgname=linux-neko-hardened
+version=7.2.11
+revision=1
+archs="x86_64*"
+short_desc="Kernel-Neko Hardened (BORE) for Neko Void Linux"
+maintainer="Neko Void Linux <nekovoid@local>"
+license="GPL-2.0-only"
+homepage="https://github.com/Neko-Void-Linux/Kernel-Neko"
+distfiles="https://github.com/Neko-Void-Linux/Kernel-Neko/releases/download/linux-neko-hardened-7.2.11/linux-neko-hardened-7.2.11.tar.gz"
+checksum="0000000000000000000000000000000000000000000000000000000000000000"
+create_wrksrc=yes
+depends="linux-base"
+nodebug=yes
+nostrip=yes
+noverifyrdeps=yes
+noshlibprovides=yes
+preserve=yes
+triggers="kernel-hooks"
+kernel_hooks_version="7.2.11-neko-hardened"
+
+do_install() {
+	vmkdir boot
+	vmkdir usr
+	cp -a boot/. ${DESTDIR}/boot/
+	cp -a usr/. ${DESTDIR}/usr/
+}
