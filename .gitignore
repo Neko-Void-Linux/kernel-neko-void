@@ -15,7 +15,8 @@ src/
 
 # Copias locales o referencias temporales
 kernel-neko-void-main/
-linux-*/
+linux-[0-9]*/
+linux-src/
 _legacy/
 
 # Archivos de sistema y editores
