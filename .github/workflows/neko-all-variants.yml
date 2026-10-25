@@ -72,7 +72,7 @@ jobs:
       - name: 5. Publicar Release en GitHub
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "${{ env.RELEASE_TAG }}"
+          tag_name: "rc"
           name: "Kernel-Neko ${{ matrix.variant }} (${{ env.TAR_NAME }})"
           body: |
             ### Kernel-Neko ${{ matrix.variant }} para Neko Void Linux
