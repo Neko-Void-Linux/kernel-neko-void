@@ -73,7 +73,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "rc"
-          name: "Kernel-Neko ${{ matrix.variant }} (${{ env.TAR_NAME }})"
+          name: "Kernel-Neko Release candidate"
           body: |
             ### Kernel-Neko ${{ matrix.variant }} para Neko Void Linux
             Kernel compilado nativamente para Neko Void Linux con soporte de xbps-src y triggers de kernel-hooks.
